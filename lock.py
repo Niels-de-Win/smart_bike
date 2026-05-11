@@ -55,7 +55,6 @@ for gpio in MOTOR_PINS:
 
 btn_close_lock = Button(BTN_CLOSE_PIN, pull_up=True)
 
-# Ultrasonic sensor setup with a small timeout to handle "No Echo" gracefully
 try:
     ultrasonic = DistanceSensor(echo=ULTRASONIC_ECHO, trigger=ULTRASONIC_TRIG, max_distance=2.0)
 except Exception as e:
@@ -115,28 +114,29 @@ display.show_locked()
 
 while True:
     try:
-        # --- 1. PROXIMITY & DASHBOARD ---
-        try:
-            dist = ultrasonic.distance * 100
-        except Exception:
-            # Fallback if sensor fails during read (e.g. No Echo)
-            dist = 200.0 # Treat as "nothing near"
-            
-        warning_msg = None
-        if dist < 30:
-            warning_msg = "CLOSE OBJECT"
-            buzzer.on()
-            if lock_closed:
-                display.show_message("!!! DANGER !!!", f"CLOSE: {dist:.1f}cm")
-        else:
-            buzzer.off()
-
-        # If unlocked, show the dashboard
+        # --- 1. PROXIMITY & DASHBOARD (Only Active When Unlocked) ---
         if not lock_closed:
+            try:
+                dist = ultrasonic.distance * 100
+            except Exception:
+                dist = 200.0
+                
+            warning_msg = None
+            if dist < 30:
+                warning_msg = "CLOSE OBJECT"
+                buzzer.on()
+            else:
+                buzzer.off()
+
             speed = get_current_speed()
             display.show_dashboard(speed, warning=warning_msg)
+        else:
+            # Ensure buzzer is off when locked
+            buzzer.off()
 
         # --- 2. LOCK CONTROL LOGIC ---
+        
+        # CLOSE LOCK: Press button while open
         if btn_close_lock.is_pressed and not lock_closed:
             print("Closing lock...")
             display.show_closing()
@@ -146,17 +146,20 @@ while True:
             print("Lock CLOSED.")
             display.show_locked()
 
+        # OPEN LOCK: Start facial recognition while closed
         if lock_closed:
             if program.main(recognizer):
                 name = recognizer.last_detected_name or "User"
                 print(f"Face recognized: {name}! Opening lock...")
                 display.show_welcome(name)
+                
                 result = angle_to_position(90)
                 stepper_move(result[1], 5, result[0])
                 lock_closed = False
                 print("Lock OPEN.")
                 sleep(2)
             else:
+                # Small delay if no face was found or system was idle
                 sleep(1)
         
         sleep(0.1)
