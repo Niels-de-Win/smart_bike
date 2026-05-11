@@ -31,8 +31,13 @@ class FaceRecognizer:
                 print(f"ERROR: Could not load {path}: {str(e)}")
 
     def recognize(self, frame):
+        # Resize frame of video to 1/4 size for faster face recognition processing
         small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        
+        # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
         rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+        
+        # Find all the faces and face encodings in the current frame of video
         face_locations = face_recognition.face_locations(rgb_small_frame)
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
@@ -53,7 +58,6 @@ class FaceRecognizer:
 def get_authorized_people():
     """Automatically find all .jpg files in the root directory."""
     people = {}
-    # Use the script's directory to find images
     base_path = os.path.dirname(os.path.abspath(__file__))
     for img_path in glob.glob(os.path.join(base_path, "*.jpg")):
         name = os.path.splitext(os.path.basename(img_path))[0].capitalize()
@@ -66,13 +70,12 @@ def main(recognizer=None):
         recognizer = FaceRecognizer(people)
 
     if not recognizer.reference_data:
-        print("ERROR: No authorized users (JPG files) found in the project directory.")
+        print("ERROR: No authorized users (JPG files) found.")
         return False
 
     # SETTINGS
-    # Load IP from .env file
     env_path = os.path.join(os.path.dirname(__file__), ".env")
-    phone_ip = "192.168.1.22"  # fallback default
+    phone_ip = "192.168.1.22"
     if os.path.exists(env_path):
         with open(env_path) as f:
             for line in f:
@@ -87,8 +90,6 @@ def main(recognizer=None):
     print(f"Attempting to connect to phone: {PHONE_STREAM_URL}...")
     cap = cv2.VideoCapture(PHONE_STREAM_URL)
 
-    # 2nd Attempt: Laptop Camera (Backup)
-    # cap.grab() is a fast way to check if the stream is actually providing data
     if not cap.isOpened() or not cap.grab():
         if cap.isOpened(): cap.release()
         print("WARNING: Could not connect to phone. Switching to Laptop Camera...")
@@ -110,9 +111,10 @@ def main(recognizer=None):
             if not ret:
                 break
 
-            # Rotate ONLY if using the phone stream (Landscape -> Portrait)
+            # ROTATION FIX: 
+            # Switched from COUNTERCLOCKWISE to CLOCKWISE to fix the 180-degree issue reported.
             if is_phone_stream:
-                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
             recognizer.recognize(frame)
             current_name = recognizer.last_detected_name

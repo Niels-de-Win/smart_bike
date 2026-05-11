@@ -7,6 +7,7 @@ A professional AI-powered face recognition lock system designed for **Raspberry 
 - **Dual Camera Support**: 
   - Primary: Wireless phone stream (via DroidCam/IP Webcam).
   - Backup: Laptop/USB camera failover.
+- **Collision Warning System**: Uses an **HC-SR04 Ultrasonic Sensor** to monitor objects in front of the bike. If something gets closer than 30cm, the system triggers a **Buzzer Alarm** and visual warning.
 - **Visual Feedback**: Real-time status and welcome messages on a **SSD1306 OLED Display** (SPI).
 - **Physical Lock**: Stepper motor control for robust locking/unlocking.
 - **Cross-Platform Testing**: Built-in **Mock GPIO and Display** systems allow you to test the entire logic on a laptop without physical hardware.
