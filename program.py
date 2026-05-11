@@ -3,6 +3,7 @@ import face_recognition
 import numpy as np
 import time
 import os
+import glob
 
 class FaceRecognizer:
     def __init__(self, reference_images):
@@ -12,7 +13,6 @@ class FaceRecognizer:
         for name, path in reference_images.items():
             try:
                 if not os.path.exists(path):
-                    print(f"WARNING: File {path} not found, skipping {name}")
                     continue
                 img = face_recognition.load_image_file(path)
                 img = np.ascontiguousarray(img)
@@ -50,18 +50,24 @@ class FaceRecognizer:
         self.last_detected_name = current_frame_name
         return frame
 
-def main():
-    people = {
-        "Gyokmen": "gyokmen.jpg",
-        "Veerle":  "veerle.jpg",
-        "Niels":   "niels.jpg",
-        "Maxim":   "maxim.jpg"
-    }
+def get_authorized_people():
+    """Automatically find all .jpg files in the root directory."""
+    people = {}
+    # Use the script's directory to find images
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    for img_path in glob.glob(os.path.join(base_path, "*.jpg")):
+        name = os.path.splitext(os.path.basename(img_path))[0].capitalize()
+        people[name] = img_path
+    return people
 
-    recognizer = FaceRecognizer(people)
+def main(recognizer=None):
+    if recognizer is None:
+        people = get_authorized_people()
+        recognizer = FaceRecognizer(people)
+
     if not recognizer.reference_data:
-        print("ERROR: No reference images found.")
-        return
+        print("ERROR: No authorized users (JPG files) found in the project directory.")
+        return False
 
     # SETTINGS
     # Load IP from .env file
@@ -74,15 +80,17 @@ def main():
                     phone_ip = line.strip().split("=", 1)[1]
                     break
 
-        PHONE_STREAM_URL = f"http://{phone_ip}:4747/video"
-        is_phone_stream = True
+    PHONE_STREAM_URL = f"http://{phone_ip}:4747/video"
+    is_phone_stream = True
 
     # 1st Attempt: Phone Camera
     print(f"Attempting to connect to phone: {PHONE_STREAM_URL}...")
     cap = cv2.VideoCapture(PHONE_STREAM_URL)
 
     # 2nd Attempt: Laptop Camera (Backup)
-    if not cap.isOpened():
+    # cap.grab() is a fast way to check if the stream is actually providing data
+    if not cap.isOpened() or not cap.grab():
+        if cap.isOpened(): cap.release()
         print("WARNING: Could not connect to phone. Switching to Laptop Camera...")
         cap = cv2.VideoCapture(0)
         is_phone_stream = False
@@ -128,10 +136,12 @@ def main():
 
     except KeyboardInterrupt:
         print("\nStopped by user.")
+        raise
     finally:
         if cap.isOpened():
             cap.release()
         print("--- System Closed ---")
+    return False
 
 if __name__ == "__main__":
     main()

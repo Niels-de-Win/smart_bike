@@ -1,8 +1,10 @@
 #!/bin/bash
 
-ENV_FILE=~/Smart_Bike/.env
+ENV_FILE=".env"
 
-cd ~/Smart_Bike
+# Get the directory of the script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
 
 # Ask for network settings
 echo "=== Smart Bike Setup ==="
@@ -26,9 +28,19 @@ echo "Settings saved to .env"
 sudo nmcli dev wifi connect "$SSID" password "$WIFI_PASSWORD"
 echo "WiFi updated."
 
+# Setup virtual environment if it doesn't exist
+if [ ! -d ".venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv .venv
+fi
+
+echo "Installing requirements..."
+source .venv/bin/activate
+pip install -r requirements.txt
+
 echo ""
 echo "=== Setup complete. Starting Smart Bike... ==="
 echo ""
 
-source .venv/bin/activate
 python lock.py
+
