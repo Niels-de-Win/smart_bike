@@ -16,7 +16,9 @@ except (ImportError, Exception):
     
     class MockDevice:
         def __init__(self, *args, **kwargs): 
-            self.distance = 2.0 # Default far away
+            self._distance = 2.0
+        @property
+        def distance(self): return self._distance
         @property
         def is_pressed(self): return False
         @property
@@ -52,7 +54,16 @@ for gpio in MOTOR_PINS:
     stepper_obj.append(DigitalOutputDevice(gpio))
 
 btn_close_lock = Button(BTN_CLOSE_PIN, pull_up=True)
-ultrasonic = DistanceSensor(echo=ULTRASONIC_ECHO, trigger=ULTRASONIC_TRIG, max_distance=2.0)
+
+# Ultrasonic sensor setup with a small timeout to handle "No Echo" gracefully
+try:
+    ultrasonic = DistanceSensor(echo=ULTRASONIC_ECHO, trigger=ULTRASONIC_TRIG, max_distance=2.0)
+except Exception as e:
+    print(f"WARNING: Ultrasonic sensor failed to initialize: {e}")
+    class MockSensor:
+        def __init__(self): self.distance = 2.0
+    ultrasonic = MockSensor()
+
 buzzer = Buzzer(BUZZER_PIN)
 
 lock_closed = True
@@ -69,16 +80,10 @@ arrSeq = [[0,0,0,1],
           [1,0,0,1]]
 
 def get_current_speed():
-    """
-    Placeholder for speed calculation. 
-    Can be replaced with a Hall Effect sensor or GPS logic.
-    For now, returns a simulated speed when unlocked.
-    """
     global current_speed
     if lock_closed:
         current_speed = 0
     else:
-        # Simulate slight speed variations for the dashboard
         current_speed = max(0, min(45, current_speed + random.randint(-2, 3)))
     return current_speed
 
@@ -111,9 +116,13 @@ display.show_locked()
 while True:
     try:
         # --- 1. PROXIMITY & DASHBOARD ---
-        dist = ultrasonic.distance * 100
+        try:
+            dist = ultrasonic.distance * 100
+        except Exception:
+            # Fallback if sensor fails during read (e.g. No Echo)
+            dist = 200.0 # Treat as "nothing near"
+            
         warning_msg = None
-        
         if dist < 30:
             warning_msg = "CLOSE OBJECT"
             buzzer.on()
@@ -128,8 +137,6 @@ while True:
             display.show_dashboard(speed, warning=warning_msg)
 
         # --- 2. LOCK CONTROL LOGIC ---
-        
-        # If lock is OPEN, wait for button press to CLOSE it
         if btn_close_lock.is_pressed and not lock_closed:
             print("Closing lock...")
             display.show_closing()
@@ -139,13 +146,11 @@ while True:
             print("Lock CLOSED.")
             display.show_locked()
 
-        # If lock is CLOSED, start facial recognition to OPEN it
         if lock_closed:
             if program.main(recognizer):
                 name = recognizer.last_detected_name or "User"
                 print(f"Face recognized: {name}! Opening lock...")
                 display.show_welcome(name)
-                
                 result = angle_to_position(90)
                 stepper_move(result[1], 5, result[0])
                 lock_closed = False
