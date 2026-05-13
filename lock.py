@@ -6,7 +6,7 @@ from display_manager import DisplayManager
 
 # Try to import gpiozero, fallback to a mock if not on a Raspberry Pi
 try:
-    from gpiozero import DigitalOutputDevice, Button, DistanceSensor, Buzzer
+    from gpiozero import DigitalOutputDevice, Button, DistanceSensor, TonalBuzzer
     from gpiozero.devices import Device
     Device.ensure_pin_factory()
     HAS_GPIO = True
@@ -28,11 +28,13 @@ except (ImportError, Exception):
         def beep(self, *args, **kwargs): print("!!! BEEP !!!")
         def on(self): pass
         def off(self): pass
+        def play(self, *args, **kwargs): print("!!! PLAY TONE !!!")
+        def stop(self): print("!!! STOP TONE !!!")
     
     DigitalOutputDevice = MockDevice
     Button = MockDevice
     DistanceSensor = MockDevice
-    Buzzer = MockDevice
+    TonalBuzzer = MockDevice
 
 # Initialize OLED Display
 display = DisplayManager()
@@ -63,7 +65,7 @@ except Exception as e:
         def __init__(self): self.distance = 2.0
     ultrasonic = MockSensor()
 
-buzzer = Buzzer(BUZZER_PIN)
+buzzer = TonalBuzzer(BUZZER_PIN)
 
 lock_closed = True
 seq_pointer = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -124,15 +126,15 @@ while True:
             warning_msg = None
             if dist < 30:
                 warning_msg = "CLOSE OBJECT"
-                buzzer.on()
+                buzzer.play(880)
             else:
-                buzzer.off()
+                buzzer.stop()
 
             speed = get_current_speed()
             display.show_dashboard(speed, warning=warning_msg)
         else:
             # Ensure buzzer is off when locked
-            buzzer.off()
+            buzzer.stop()
 
         # --- 2. LOCK CONTROL LOGIC ---
         

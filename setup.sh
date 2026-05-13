@@ -25,8 +25,12 @@ echo ""
 echo "Settings saved to .env"
 
 # Apply WiFi settings
-sudo nmcli dev wifi connect "$SSID" password "$WIFI_PASSWORD"
-echo "WiFi updated."
+if command -v nmcli &> /dev/null; then
+    sudo nmcli dev wifi connect "$SSID" password "$WIFI_PASSWORD"
+    echo "WiFi updated."
+else
+    echo "Warning: nmcli not found. Please update WiFi manually."
+fi
 
 # Setup virtual environment if it doesn't exist
 if [ ! -d ".venv" ]; then
@@ -42,5 +46,5 @@ echo ""
 echo "=== Setup complete. Starting Smart Bike... ==="
 echo ""
 
-python lock.py
+python3 lock.py
 
